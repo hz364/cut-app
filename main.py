@@ -20,9 +20,10 @@ current = [0]
 global s1 
 global s3
 global s4
+global s5
 
 def upload_csv_to_server(attr, old, new):
-    global x,y,s1,s4,initRange
+    global x,y,s1,s4,s5
     data = base64.b64decode(new).decode('utf-8')
     data = data.split('\r\n')
     print(data)
@@ -37,8 +38,7 @@ def upload_csv_to_server(attr, old, new):
     print(current)
     s1.data = dict(x=time, y=current)
     s4.data = dict(x=time, y=current)
-    if len(time)!=0:
-        initRange = Range1d(start = time[0],end = time[-1])
+    s5.data = dict(x=time, y=current)
 
 
 
@@ -53,6 +53,7 @@ s1 = ColumnDataSource(data=dict(x=time, y=current))
 s2 = ColumnDataSource(data=dict(x=[], y=[]))
 s3 = ColumnDataSource(data=dict(x=[], y=[]))
 s4 = ColumnDataSource(data=dict(x=time, y=current))
+s5 = ColumnDataSource(data=dict(x=time, y=current))
 # create a plot and style its properties
 p = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save", toolbar_location="above",
            x_axis_type="linear", x_axis_location="above",x_range=(time[0],time[-1]),
@@ -102,6 +103,7 @@ range_tool.x_range.js_on_change('end', callback1)
 # Plotting data in range
 p2 = figure( plot_height=300,plot_width=600,tools="", title="Watch Here",background_fill_color="#efefef")
 p2.line('x', 'y', source=s2, alpha=0.6)
+p2.line('x', 'y', source=s3, alpha=0.6)
 
 # 2. Saving data in range
 savebutton = Button(label="Save Segmented Data", button_type="success")
@@ -172,36 +174,34 @@ def select_functions():
         selected = BaseFraction
     return selected
 
-p3 = figure( plot_height=300,plot_width=600,tools="", title="Origin&Fit",background_fill_color="#efefef")
-p3.line('x', 'y', source=s3, alpha=0.6)
-# p3.line('x', 'y', source=s2, alpha=0.6)
+p3 = figure( plot_height=300,plot_width=600,tools="xpan,pan,reset,box_zoom,save", title="Origin&Fit",background_fill_color="#efefef")
+p3.line('x', 'y', source=s5, alpha=0.6)
+p3.line('x', 'y', source=s1, alpha=0.6)
 
 p4 = figure( plot_height=300,plot_width=600,tools="", title="Divided",background_fill_color="#efefef")
 p4.line('x', 'y', source=s4, alpha=0.6)
 
 def update():
-    global s3,s4
+    global s3,s4,s5
     function = select_functions()
     print(function(1,1,1,1))
     x3 = s3.data['x']
     y3 = s3.data['y']
     x4 = s4.data['x']
+    y5 = copy.deepcopy(s1.data['y'])
     y4 = copy.deepcopy(s1.data['y'])
-    x_tofit = x3
-    y_tofit = y3
-    y_to_plot3=y3
-    x_to_plot4=x4
-    y_to_plot4=y4
     popt = []
     print(x4)
     if fittingFunction.value == "BaseLinear":
         popt, pcov = curve_fit(function, x3, y3)
         for i in range(len(y3)):
-            y_to_plot3[i] = function(x3[i],*popt)   
+            y3[i] = function(x3[i],*popt)   
         for j in range(len(x4)):
-            y_to_plot4[j] = y4[j]/function(x4[j],*popt)
-    s3.data['y'] = y_to_plot3
-    s4.data['y'] = y_to_plot4
+            y5[j] = function(x4[j],*popt)
+            y4[j] = y4[j]/function(x4[j],*popt)
+    s3.data['y'] = y3
+    s4.data['y'] = y4
+    s5.data['y'] = y5
     # for i in range(len(y3)):
     #     x_tofit[i] = x3[i]- min(x3)
     #     y_tofit[i] = (y3[i]-min(y3))*100000
@@ -229,4 +229,4 @@ range_tool.x_range.on_change('start', lambda attr, old, new: update())
 range_tool.x_range.on_change('end', lambda attr, old, new: update())
 
 # put the button and plot in a layout and add to the document
-curdoc().add_root(column(row(column(file_input_label,file_input),fittingFunction),row(p_select,p3),row(p2,p4),savebutton))
+curdoc().add_root(column(row(column(file_input_label,file_input),fittingFunction),row(p_select,p3),row(p4,p2),savebutton))
