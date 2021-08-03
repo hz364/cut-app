@@ -141,6 +141,19 @@ callback2 = CustomJS(args=dict(s2=s2),code="""
 
 savebutton.js_on_click(callback2)
 
+# Select if inverting
+if_invert = 'Non-inverting'
+invert_selector = Select(value=if_invert, title='If invert:', options=['Inverting', 'Non-inverting'])
+
+def invert_plot(attrname, old, new):
+    global s1,s2,s3,s4,s5
+    s1.data['y'] = [-y for y in s1.data['y']]
+    s2.data['y'] = [-y for y in s2.data['y']]
+    s3.data['y'] = [-y for y in s3.data['y']]
+    s4.data['y'] = [-y for y in s4.data['y']]
+    s5.data['y'] = [-y for y in s5.data['y']]
+
+invert_selector.on_change('value', invert_plot)
 
 # Select fitting function 
 fittingFunction = Select(title="FittingFunctions", value="",
@@ -182,14 +195,13 @@ p4.line('x', 'y', source=s4, alpha=0.6)
 def update():
     global s3,s4,s5
     function = select_functions()
-    print(function(1,1,1,1))
+    #print(function(1,1,1,1))
     x3 = s3.data['x']
     y3 = s3.data['y']
     x4 = s4.data['x']
     y5 = copy.deepcopy(s1.data['y'])
     y4 = copy.deepcopy(s1.data['y'])
     popt = []
-    print(x4)
     if fittingFunction.value == "None" or len(x3)==0:
         pass
     elif fittingFunction.value == "BaseLinear":
@@ -243,12 +255,12 @@ def update():
     s4.data['y'] = y4
     s5.data['y'] = y5
 
-controls = [fittingFunction]
+controls = [fittingFunction,invert_selector]
 for control in controls:
     control.on_change('value', lambda attr, old, new: update())
 
-range_tool.x_range.on_change('start', lambda attr, old, new: update())
-range_tool.x_range.on_change('end', lambda attr, old, new: update())
+range_tool.x_range.on_change('start',lambda attr, old, new: update())
+range_tool.x_range.on_change('end',lambda attr, old, new: update())
 
 # put the button and plot in a layout and add to the document
-curdoc().add_root(column(row(column(file_input_label,file_input),fittingFunction),row(p_select,p3),row(p4,p2),savebutton))
+curdoc().add_root(column(row(column(file_input_label,file_input),invert_selector,fittingFunction),row(p_select,p3),row(p4,p2),savebutton))
