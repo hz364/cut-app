@@ -11,6 +11,7 @@ from bokeh.models import CustomJS, ColumnDataSource, Slider, ranges
 from bokeh.plotting import Figure, output_file, show
 from bokeh.models import Button  
 import base64
+import copy
 
 file_input_label = Div(text='Please select a file:')
 file_input = FileInput()
@@ -185,7 +186,7 @@ def update():
     x3 = s3.data['x']
     y3 = s3.data['y']
     x4 = s4.data['x']
-    y4 = s4.data['y']
+    y4 = copy.deepcopy(s1.data['y'])
     x_tofit = x3
     y_tofit = y3
     y_to_plot3=y3
@@ -198,13 +199,8 @@ def update():
         for i in range(len(y3)):
             y_to_plot3[i] = function(x3[i],*popt)   
         for j in range(len(x4)):
-            if abs(function(x4[j],*popt))< 1e-20:
-                del(y_to_plot4[j])
-                del(x_to_plot4[j])
-            else:
-                y_to_plot4[j] = y4[j]/function(x4[j],*popt)
+            y_to_plot4[j] = y4[j]/function(x4[j],*popt)
     s3.data['y'] = y_to_plot3
-    s4.data['x'] = x_to_plot4
     s4.data['y'] = y_to_plot4
     # for i in range(len(y3)):
     #     x_tofit[i] = x3[i]- min(x3)
