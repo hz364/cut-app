@@ -192,7 +192,9 @@ def update():
     y4 = copy.deepcopy(s1.data['y'])
     popt = []
     print(x4)
-    if fittingFunction.value == "BaseLinear":
+    if fittingFunction.value == "None":
+        pass
+    elif fittingFunction.value == "BaseLinear":
         popt, pcov = curve_fit(function, x3, y3)
         for i in range(len(y3)):
             y3[i] = function(x3[i],*popt)   
