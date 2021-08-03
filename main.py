@@ -1,5 +1,6 @@
 import numpy as np
 from os.path import dirname, join
+from scipy.optimize import curve_fit
 from bokeh.io import save,curdoc
 from bokeh.util.browser import view
 from bokeh.plotting import figure, ColumnDataSource
@@ -17,9 +18,10 @@ time = [0]
 current = [0]
 global s1 
 global s3
+global s4
 
 def upload_csv_to_server(attr, old, new):
-    global x,y,s1,initRange
+    global x,y,s1,s4,initRange
     data = base64.b64decode(new).decode('utf-8')
     data = data.split('\r\n')
     print(data)
@@ -33,6 +35,7 @@ def upload_csv_to_server(attr, old, new):
     print(time)
     print(current)
     s1.data = dict(x=time, y=current)
+    s4.data = dict(x=time, y=current)
     if len(time)!=0:
         initRange = Range1d(start = time[0],end = time[-1])
 
@@ -48,14 +51,14 @@ file_input.on_change('value', upload_csv_to_server)
 s1 = ColumnDataSource(data=dict(x=time, y=current))
 s2 = ColumnDataSource(data=dict(x=[], y=[]))
 s3 = ColumnDataSource(data=dict(x=[], y=[]))
+s4 = ColumnDataSource(data=dict(x=time, y=current))
 # create a plot and style its properties
 p = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save", toolbar_location="above",
            x_axis_type="linear", x_axis_location="above",x_range=(time[0],time[-1]),
            background_fill_color="#efefef")
 p.line('x', 'y', source=s1)
 
-p_select = figure(title="Drag the middle and edges of the selection box to change the range above",
-                plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save",y_range=p.y_range,
+p_select = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save",y_range=p.y_range,
                 x_axis_type="linear", x_axis_location="above",
                 toolbar_location="above", background_fill_color="#efefef")
 
@@ -88,7 +91,7 @@ callback1 = CustomJS(args=dict(s1=s1, s2=s2, s3=s3),code="""
             } 
         }
         //alert(x2[x2.length-1])
-        s3 = s2
+        s3.data = s2.data
         s2.change.emit();
         s3.change.emit();
 
@@ -168,10 +171,51 @@ def select_functions():
         selected = BaseFraction
     return selected
 
+p3 = figure( plot_height=300,plot_width=600,tools="", title="Origin&Fit",background_fill_color="#efefef")
+p3.line('x', 'y', source=s3, alpha=0.6)
+# p3.line('x', 'y', source=s2, alpha=0.6)
+
+p4 = figure( plot_height=300,plot_width=600,tools="", title="Divided",background_fill_color="#efefef")
+p4.line('x', 'y', source=s4, alpha=0.6)
+
 def update():
-    global s3
+    global s3,s4
     function = select_functions()
     print(function(1,1,1,1))
+    x3 = s3.data['x']
+    y3 = s3.data['y']
+    x4 = s4.data['x']
+    y4 = s4.data['y']
+    x_tofit = x3
+    y_tofit = y3
+    y_to_plot3=y3
+    x_to_plot4=x4
+    y_to_plot4=y4
+    popt = []
+    print(x4)
+    if fittingFunction.value == "BaseLinear":
+        popt, pcov = curve_fit(function, x3, y3)
+        for i in range(len(y3)):
+            y_to_plot3[i] = function(x3[i],*popt)   
+        for j in range(len(x4)):
+            if abs(function(x4[j],*popt))< 1e-20:
+                del(y_to_plot4[j])
+                del(x_to_plot4[j])
+            else:
+                y_to_plot4[j] = y4[j]/function(x4[j],*popt)
+    s3.data['y'] = y_to_plot3
+    s4.data['x'] = x_to_plot4
+    s4.data['y'] = y_to_plot4
+    # for i in range(len(y3)):
+    #     x_tofit[i] = x3[i]- min(x3)
+    #     y_tofit[i] = (y3[i]-min(y3))*100000
+    # if len(x_tofit) !=0:
+    #     popt, pcov = curve_fit(function, x_tofit,y_tofit,maxfev=5000)
+    #     print(popt)
+    # for i in range(len(y_tofit)):
+    #     y_tofit[i] = function(x_tofit[i], *popt)/100000+min(y3)
+    # s3.data['y']=y_tofit
+    
     # s3.data['y'] = dict(
     #     x=df[x_name],
     #     y=df[y_name],
@@ -185,8 +229,8 @@ controls = [fittingFunction]
 for control in controls:
     control.on_change('value', lambda attr, old, new: update())
 
-
-
+range_tool.x_range.on_change('start', lambda attr, old, new: update())
+range_tool.x_range.on_change('end', lambda attr, old, new: update())
 
 # put the button and plot in a layout and add to the document
-curdoc().add_root(column(row(column(file_input_label,file_input),fittingFunction),p_select,p2,savebutton))
+curdoc().add_root(column(row(column(file_input_label,file_input),fittingFunction),row(p_select,p3),row(p2,p4),savebutton))
