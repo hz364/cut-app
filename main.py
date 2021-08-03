@@ -13,20 +13,21 @@ from bokeh.models import Button
 import base64
 import copy
 
-file_input_label = Div(text='Please select a file:')
-file_input = FileInput()
-time = [0]
-current = [0]
+
 global s1 
 global s3
 global s4
 global s5
 
+# Load data from csv file
+file_input_label = Div(text='Please select a file:')
+file_input = FileInput()
+time = [0]
+current = [0]
 def upload_csv_to_server(attr, old, new):
-    global x,y,s1,s4,s5
+    global s1,s4,s5
     data = base64.b64decode(new).decode('utf-8')
     data = data.split('\r\n')
-    print(data)
     data = data[1:]
     time = []
     current = []
@@ -40,31 +41,28 @@ def upload_csv_to_server(attr, old, new):
     s4.data = dict(x=time, y=current)
     s5.data = dict(x=time, y=current)
 
-
-
-# get data
-
 file_input.on_change('value', upload_csv_to_server)
 
-# path = "/Users/apple/Desktop/testdata.csv"
-# time,current= np.loadtxt(path,skiprows=1, unpack = True, delimiter = ',',usecols = (0,1))
+# Initialise data sources
+# s1: Original whole range data    s2: Section data            s3: Fitted section data
+# s4: Devided whole range data     s5: Fitted wholerange data
 
 s1 = ColumnDataSource(data=dict(x=time, y=current))
 s2 = ColumnDataSource(data=dict(x=[], y=[]))
 s3 = ColumnDataSource(data=dict(x=[], y=[]))
 s4 = ColumnDataSource(data=dict(x=time, y=current))
 s5 = ColumnDataSource(data=dict(x=time, y=current))
-# create a plot and style its properties
+
+# Create a plot and style its properties (currently not shown)
 p = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save", toolbar_location="above",
            x_axis_type="linear", x_axis_location="above",x_range=(time[0],time[-1]),
            background_fill_color="#efefef")
 p.line('x', 'y', source=s1)
 
+# Cutting data section with range tools (top-left )
 p_select = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save",y_range=p.y_range,
                 x_axis_type="linear", x_axis_location="above",
                 toolbar_location="above", background_fill_color="#efefef")
-
-
 range_tool = RangeTool(x_range=p.x_range)
 range_tool.overlay.fill_color = "navy"
 range_tool.overlay.fill_alpha = 0.2
@@ -74,7 +72,6 @@ p_select.ygrid.grid_line_color = None
 p_select.add_tools(range_tool)
 p_select.toolbar.active_multi = range_tool
 
-## 1. Cutting data in range
 callback1 = CustomJS(args=dict(s1=s1, s2=s2, s3=s3),code="""
         var data1 = s1.data;
         var data2 = s2.data;
@@ -100,12 +97,14 @@ callback1 = CustomJS(args=dict(s1=s1, s2=s2, s3=s3),code="""
     """)
 range_tool.x_range.js_on_change('start', callback1)
 range_tool.x_range.js_on_change('end', callback1)
-# Plotting data in range
+
+
+# Plotting data in range (bottom right)
 p2 = figure( plot_height=300,plot_width=600,tools="", title="Watch Here",background_fill_color="#efefef")
 p2.line('x', 'y', source=s2, alpha=0.6)
 p2.line('x', 'y', source=s3, alpha=0.6)
 
-# 2. Saving data in range
+# Saving data in range
 savebutton = Button(label="Save Segmented Data", button_type="success")
 callback2 = CustomJS(args=dict(s2=s2),code="""
         function table_to_csv(source) {
@@ -142,12 +141,10 @@ callback2 = CustomJS(args=dict(s2=s2),code="""
 
 savebutton.js_on_click(callback2)
 
-# Tuesday
 
+# Select fitting function 
 fittingFunction = Select(title="FittingFunctions", value="",
                options=open(join(dirname(__file__), 'fitting-functions.txt')).read().split())
-
-
 def select_functions():
     fittingFunction_val = fittingFunction.value
     selected = None
@@ -174,11 +171,12 @@ def select_functions():
         selected = BaseFraction
     return selected
 
+# Plot data and the fitting function in the top-right plot and divided data in the bottom-left plot
 p3 = figure( plot_height=300,plot_width=600,tools="xpan,pan,reset,box_zoom,save", title="Origin&Fit",background_fill_color="#efefef")
 p3.line('x', 'y', source=s5, alpha=0.6)
 p3.line('x', 'y', source=s1, alpha=0.6)
 
-p4 = figure( plot_height=300,plot_width=600,tools="", title="Divided",background_fill_color="#efefef")
+p4 = figure( plot_height=300,plot_width=600,tools="",toolbar_location="above", title="Divided",background_fill_color="#efefef")
 p4.line('x', 'y', source=s4, alpha=0.6)
 
 def update():
@@ -192,7 +190,7 @@ def update():
     y4 = copy.deepcopy(s1.data['y'])
     popt = []
     print(x4)
-    if fittingFunction.value == "None":
+    if fittingFunction.value == "None" or len(x3)==0:
         pass
     elif fittingFunction.value == "BaseLinear":
         popt, pcov = curve_fit(function, x3, y3)
@@ -201,28 +199,50 @@ def update():
         for j in range(len(x4)):
             y5[j] = function(x4[j],*popt)
             y4[j] = y4[j]/function(x4[j],*popt)
+
+    elif fittingFunction.value == "BaseExponential":
+        xmin,ymin = min(x3), min(y3)
+        x30 = [x - xmin for x in x3]
+        y30 = [(y - ymin)*100000 for y in y3]
+        popt, pcov = curve_fit(function, x30, y30,maxfev=50000)
+        for i in range(len(y3)):
+            y3[i] = function(x3[i]-xmin,*popt)/100000 + ymin
+        for j in range(len(x4)):
+            y5[j] = function(x4[j]-xmin,*popt)/100000 + ymin
+            y4[j] = y4[j]/(function(x4[j]-xmin,*popt)/100000 + ymin)
+
+    elif fittingFunction.value == "BaseLogarithmic":
+        # Normalize function for improved fitting
+        corrX = [x/x3[0] for x in x3]
+        corrYFactor = y3[-1]
+        corrY = [y/corrYFactor for y in y3]
+
+        popt, pcov = curve_fit(function, corrX, corrY,maxfev=50000)
+        for i in range(len(y3)):
+            y3[i] = corrYFactor*function(x3[i]/x3[0],*popt)
+        for j in range(len(x4)):
+            y5[j] = corrYFactor*function(x4[j]/x3[0],*popt)
+            y4[j] = y4[j]/(corrYFactor*function(x4[j]/x3[0],*popt))
+
+    elif fittingFunction.value == "BaseFraction":
+        # Offset the function for improved fitting
+        corrX = [x - x3[0] for x in x3]
+        corrYFactor = y3[-1]
+        corrY = [y-corrYFactor for y in y3]
+
+        popt, pcov = curve_fit(function, corrX, corrY,maxfev=50000)
+        for i in range(len(y3)):
+            y3[i] = corrYFactor+function(x3[i]-x3[0],*popt)
+        for j in range(len(x4)):
+            y5[j] = corrYFactor+function(x4[j]-x3[0],*popt)
+            y4[j] = y4[j]/(corrYFactor+function(x4[j]-x3[0],*popt))
+
+
+
     s3.data['y'] = y3
     s4.data['y'] = y4
     s5.data['y'] = y5
-    # for i in range(len(y3)):
-    #     x_tofit[i] = x3[i]- min(x3)
-    #     y_tofit[i] = (y3[i]-min(y3))*100000
-    # if len(x_tofit) !=0:
-    #     popt, pcov = curve_fit(function, x_tofit,y_tofit,maxfev=5000)
-    #     print(popt)
-    # for i in range(len(y_tofit)):
-    #     y_tofit[i] = function(x_tofit[i], *popt)/100000+min(y3)
-    # s3.data['y']=y_tofit
-    
-    # s3.data['y'] = dict(
-    #     x=df[x_name],
-    #     y=df[y_name],
-    #     color=df["color"],
-    #     title=df["Title"],
-    #     year=df["Year"],
-    #     revenue=df["revenue"],
-    #     alpha=df["alpha"],
-    # )
+
 controls = [fittingFunction]
 for control in controls:
     control.on_change('value', lambda attr, old, new: update())
