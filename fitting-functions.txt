@@ -1,0 +1,4 @@
+BaseLinear
+BaseExponential
+BaseLogarithmic
+BaseFraction
