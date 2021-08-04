@@ -13,15 +13,18 @@ from bokeh.models import Button
 import base64
 import copy
 
-
 global s1 
+global s2
 global s3
 global s4
 global s5
 global s6
+
 # Load data from csv file
+
 file_input_label = Div(text='Please select a file:')
 file_input = FileInput(css_classes=["my_fileInput"])
+# css to style for the loading button
 style = Div(text="""
 <style>
 ::-webkit-file-upload-button {
@@ -97,14 +100,12 @@ style = Div(text="""
 }
 </style>
 """)
-
 # ::-webkit-file-upload-button {
 #   background: #61b93d;
 #   color: white;
 #   padding: 1em;
 #   border-radius: 6px;
 # }
-
 
 
 time = [0]
@@ -128,6 +129,8 @@ def upload_csv_to_server(attr, old, new):
 
 file_input.on_change('value', upload_csv_to_server)
 
+
+
 # Initialise data sources
 # s1: Original whole range data    s2: Section data            s3: Fitted section data
 # s4: Devided whole range data     s5: Fitted wholerange data
@@ -139,15 +142,15 @@ s4 = ColumnDataSource(data=dict(x=time, y=current))
 s5 = ColumnDataSource(data=dict(x=time, y=current))
 s6 = ColumnDataSource(data=dict(x=[0,0,0], y=[0,0,0]))
 
-# Create a plot and style its properties (currently not shown)
+# Create a plot for original data and style its properties (currently not shown)
 p = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save", toolbar_location="above",
            x_axis_type="linear", x_axis_location="above",x_range=(time[0],time[-1]),
            background_fill_color="#efefef")
 p.line('x', 'y', source=s1)
 
-# Cutting data section with range tools (top-left )
+# Plot for cutting data with range tools (top-left )
 p_select = figure(plot_height=300, plot_width=600, tools="xpan,pan,reset,box_zoom,save",y_range=p.y_range,
-                x_axis_type="linear", x_axis_location="above",
+                x_axis_type="linear", x_axis_location="above",title = "Range Selector",
                 toolbar_location="above", background_fill_color="#efefef")
 range_tool = RangeTool(x_range=p.x_range)
 range_tool.overlay.fill_color = "navy"
@@ -194,7 +197,7 @@ p2.line('x', 'y', source=s3, alpha=0.6)
 savebutton = Button(label="Save Segmented Data", button_type="success")
 callback2 = CustomJS(args=dict(s2=s2),code="""
         function table_to_csv(source) {
-            const columns = Object.keys(source.data)
+            const columns = ['x','y']
             const nrows = source.get_length()
             const lines = [columns.join(',')]
 
@@ -208,7 +211,7 @@ callback2 = CustomJS(args=dict(s2=s2),code="""
             }
             return lines.join('\\n').concat('\\n')
         }
-        const filename = '/Users/apple/Desktop/data_result.csv'
+        const filename = 'SectionData.csv'
         var filetext = table_to_csv(s2)
         const blob = new Blob([filetext], { type: 'text/csv;charset=utf-8;' })
 
@@ -240,6 +243,18 @@ def invert_plot(attrname, old, new):
     s5.data['y'] = [-y for y in s5.data['y']]
 
 invert_selector.on_change('value', invert_plot)
+def update_s2(attr,old,new):
+    x1 = copy.deepcopy(s1.data['x'])
+    y1 = copy.deepcopy(s1.data['y'])
+    x2 = []
+    y2 = []
+    for i in range(len(s1.data['x'])):
+        if x1[i]<range_tool.x_range.end and x1[i]>range_tool.x_range.start:
+            x2.append(x1[i])
+            y2.append(y1[i])
+    s2.data['x'] = x2
+    s2.data['y'] = y2
+invert_selector.on_change('value', update_s2)
 
 # Select fitting function 
 fittingFunction = Select(title="FittingFunctions", value="",
@@ -280,7 +295,7 @@ p4.line('x', 'y', source=s4, alpha=0.6)
 
 
 def update():
-    global s3,s4,s5,s6
+    global s2,s3,s4,s5,s6
     function = select_functions()
     #print(function(1,1,1,1))
     x3 = s3.data['x']
@@ -345,7 +360,8 @@ def update():
     s5.data['y'] = y5
     s6.data['y'] = abc
     print(abc)
-
+    print(s1.data)
+    print(s2.data)
 controls = [fittingFunction,invert_selector]
 for control in controls:
     control.on_change('value', lambda attr, old, new: update())
@@ -355,15 +371,13 @@ range_tool.x_range.on_change('end',lambda attr, old, new: update())
 
 # Saving fitting parameters
 saveFuncButton = Button(label="Save Fitting Function Parameters", button_type="success")
-# def paramCall(attr, old, new):
-#     fieldnames = ["Function Type", "a", "b", "c", "x start", "x end"]
-#     pass
-paramCall = CustomJS(args=dict(s2=s2,fittingFunction=fittingFunction,s6=s6),code="""
+
+paramCall = CustomJS(args=dict(s2=s2,fittingFunction=fittingFunction,s6=s6,invert_selector=invert_selector),code="""
         function parameter_to_csv(s2,fittingFunction,abc) {
             lines = []
             console.log(abc)
-            row0 = ["Function Type", "a", "b", "c", "x start", "x end"]
-            row1 = [fittingFunction.value, abc[0],abc[1],abc[2], s2.data['x'][0],s2.data['x'][s2.data['x'].length-1]]
+            row0 = ["if invert","fit type", "a", "b", "c", "x start", "x end"]
+            row1 = [invert_selector.value,fittingFunction.value, abc[0],abc[1],abc[2], s2.data['x'][0],s2.data['x'][s2.data['x'].length-1]]
             lines.push(row0.join(','))
             lines.push(row1.join(','))
             return lines.join('\\n').concat('\\n')
@@ -387,8 +401,45 @@ paramCall = CustomJS(args=dict(s2=s2,fittingFunction=fittingFunction,s6=s6),code
 saveFuncButton.js_on_click(paramCall)
 
 
+# Saving divided data (s4)
+saveDividedButton = Button(label="Save Divided Data", button_type="success")
+callback4 = CustomJS(args=dict(s4=s4),code="""
+        function table_to_csv(source) {
+            const columns = ["x","y"]
+            console.log(columns)
+            const nrows = source.get_length()
+            const lines = [columns.join(',')]
+
+            for (let i = 0; i < nrows; i++) {
+                let row = [];
+                for (let j = 0; j < columns.length; j++) {
+                    const column = columns[j]
+                    row.push(source.data[column][i].toString())
+                }
+                lines.push(row.join(','))
+            }
+            return lines.join('\\n').concat('\\n')
+        }
+        const filename = 'DividedData.csv'
+        var filetext = table_to_csv(s4)
+        const blob = new Blob([filetext], { type: 'text/csv;charset=utf-8;' })
+
+        //addresses IE
+        if (navigator.msSaveBlob) {
+            navigator.msSaveBlob(blob, filename)
+        } else {
+            const link = document.createElement('a')
+            link.href = URL.createObjectURL(blob)
+            link.download = filename
+            link.target = '_blank'
+            link.style.visibility = 'hidden'
+            link.dispatchEvent(new MouseEvent('click'))
+        }
+                    """)
+
+saveDividedButton.js_on_click(callback4)
 
 
 
 # put the button and plot in a layout and add to the document
-curdoc().add_root(column(row(column(file_input_label,column(file_input,style)),invert_selector,fittingFunction),row(p_select,p3),row(p4,p2),savebutton,saveFuncButton))
+curdoc().add_root(column(row(column(file_input_label,column(file_input,style)),invert_selector,fittingFunction),row(p_select,p3),row(p4,p2),savebutton,saveDividedButton,saveFuncButton))
