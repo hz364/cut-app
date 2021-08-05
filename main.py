@@ -21,33 +21,35 @@ global s5
 global s6
 
 # Load data from csv file
-
+#4fab38
+#61b93d
+#56b93d
+#font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif;
 file_input_label = Div(text='Please select a file:')
 file_input = FileInput(css_classes=["my_fileInput"])
 # css to style for the loading button
 style = Div(text="""
 <style>
 ::-webkit-file-upload-button {
-  background: #e2e2e2;
-  color: black;
+  background: #61b93d;
+  background: -webkit-gradient(linear, left top, left bottom, from(#56b93d), to(#60b53e));
+  background: -moz-linear-gradient(top,  #56b93d,  #60b53e);
+  color: white;
   position: relative;
-  height: 40px;
-  width: 110px;
+  height: 35px;
+  width: 100px;
   margin: 0 10px 18px 0;
   text-decoration: none;
-  font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: bold;
   line-height: 25px;
   text-align: center; 
-
   -webkit-border-radius: 4px; 
   -moz-border-radius: 4px;
   border-radius: 4px;
 }
 ::-webkit-file-upload-button:hover {
-    background: #e2e2e2;
-    background: -webkit-gradient(linear, left top, left bottom, from(#e2e2e2), to(#eee));
-    background: -moz-linear-gradient(top,  #e2e2e2,  #eee);
+    background: #55a336;
+    background: -webkit-gradient(linear, left top, left bottom, from(#4fab38), to(#56b93d));
+    background: -moz-linear-gradient(top,  #4fab38,  #56b93d);
 }
 
 ::-webkit-file-upload-button:visited {
@@ -55,9 +57,9 @@ style = Div(text="""
     border-bottom: 4px solid #b2b1b1;
     text-shadow: 0px 1px 0px #fafafa;
      
-    background: #eee;
-    background: -webkit-gradient(linear, left top, left bottom, from(#eee), to(#e2e2e2));
-    background: -moz-linear-gradient(top,  #eee,  #e2e2e2);
+    background: #55a336;
+    background: -webkit-gradient(linear, left top, left bottom, from(#56b93d), to(#4fab38));
+    background: -moz-linear-gradient(top,  #56b93d,  #4fab38);
      
     box-shadow: inset 1px 1px 0 #f5f5f5;
 }
@@ -98,6 +100,18 @@ style = Div(text="""
     color: #0d8ba1;
     font-weight:bold !important;
 }
+.my_selector{
+    width: 100px;
+	height: 35px;
+	
+    color: #0d8ba1;
+    font-weight:bold !important;
+}
+::-webkit-selection {
+   background: #61b93d;
+   color: white;
+   border-radius: 6px;
+ }
 </style>
 """)
 # ::-webkit-file-upload-button {
@@ -232,7 +246,7 @@ savebutton.js_on_click(callback2)
 
 # Select if inverting
 if_invert = 'Non-inverting'
-invert_selector = Select(value=if_invert, title='If invert:', options=['Inverting', 'Non-inverting'])
+invert_selector = Select(css_classes=["my_selector"],value=if_invert, title='If invert:', options=['Inverting', 'Non-inverting'])
 
 def invert_plot(attrname, old, new):
     global s1,s2,s3,s4,s5
@@ -257,7 +271,7 @@ def update_s2(attr,old,new):
 invert_selector.on_change('value', update_s2)
 
 # Select fitting function 
-fittingFunction = Select(title="FittingFunctions", value="",
+fittingFunction = Select(css_classes=["my_selector"],title="FittingFunctions", value="",
                options=open(join(dirname(__file__), 'fitting-functions.txt')).read().split())
 def select_functions():
     fittingFunction_val = fittingFunction.value
@@ -296,10 +310,22 @@ p4.line('x', 'y', source=s4, alpha=0.6)
 
 def update():
     global s2,s3,s4,s5,s6
+    x1 = copy.deepcopy(s1.data['x'])
+    y1 = copy.deepcopy(s1.data['y'])
+    x2 = []
+    y2 = []
+    for i in range(len(s1.data['x'])):
+        if x1[i]<range_tool.x_range.end and x1[i]>range_tool.x_range.start:
+            x2.append(x1[i])
+            y2.append(y1[i])
+    s2.data['x'] = x2
+    s2.data['y'] = y2
+    print(len(s2.data['x']))
+    print('s2 finish')
     function = select_functions()
     #print(function(1,1,1,1))
-    x3 = s3.data['x']
-    y3 = s3.data['y']
+    x3 = s2.data['x']
+    y3 = s2.data['y']
     x4 = s4.data['x']
     y5 = copy.deepcopy(s1.data['y'])
     y4 = copy.deepcopy(s1.data['y'])
@@ -307,7 +333,7 @@ def update():
     if fittingFunction.value == "None" or len(x3)==0:
         pass
     elif fittingFunction.value == "BaseLinear":
-        popt, pcov = curve_fit(function, x3, y3)
+        popt, pcov = curve_fit(function, x3, y3,maxfev=50000)
         for i in range(len(y3)):
             y3[i] = function(x3[i],*popt)   
         for j in range(len(x4)):
@@ -359,9 +385,6 @@ def update():
     s4.data['y'] = y4
     s5.data['y'] = y5
     s6.data['y'] = abc
-    print(abc)
-    print(s1.data)
-    print(s2.data)
 controls = [fittingFunction,invert_selector]
 for control in controls:
     control.on_change('value', lambda attr, old, new: update())
